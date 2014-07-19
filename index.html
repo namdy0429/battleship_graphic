@@ -1,0 +1,368 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>three.js canvas - camera - orthographic</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+      body {
+        font-family: Monospace;
+        background-color: #f0f0f0;
+        margin: 0px;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+
+    <script src="static/js/three.min.js"></script>
+    <script src="static/js/OBJLoader.js"></script>
+    <script src="static/js/stats.min.js"></script>
+
+     <script type="x-shader/x-vertex" id="vertexShader">
+        // Include the Ashima code here!
+
+        varying vec2 vUv;
+        varying float noise;
+
+        float turbulence( vec3 p ) {
+            float w = 100.0;
+            float t = -.5;
+            for (float f = 1.0 ; f <= 10.0 ; f++ ){
+                float power = pow( 2.0, f );
+                t += abs( pnoise( vec3( power * p ), vec3( 10.0, 10.0, 10.0 ) ) / power );
+            }
+            return t;
+        }
+
+        void main() {
+
+            vUv = uv;
+
+            // get a turbulent 3d noise using the normal, normal to high freq
+            noise = 10.0 *  -.10 * turbulence( .5 * normal );
+            // get a 3d noise using the position, low frequency
+            float b = 5.0 * pnoise( 0.05 * position, vec3( 100.0 ) );
+            // compose both noises
+            float displacement = - 10. * noise + b;
+            
+            // move the position along the normal and transform it
+            vec3 newPosition = position + normal * displacement;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4( newPosition, 1.0 );
+
+        }
+    </script>
+
+    <script type="x-shader/x-vertex" id="fragmentShader">
+        varying vec2 vUv;
+        varying float noise;
+
+        void main() {
+
+            // compose the colour using the UV coordinate
+            // and modulate it with the noise like ambient occlusion
+            vec3 color = vec3( vUv * ( 1. - 2. * noise ), 0.0 );
+            gl_FragColor = vec4( color.rgb, 1.0 );
+
+        }
+    </script>
+    <script type="text/javascript" id="mainCode">
+        
+    </script>
+
+
+    <script>
+
+      var container, stats;
+      var camera, scene, renderer;
+      var mesh, fov=30;
+
+      var ship1 = {
+        x: "0",
+        y: "0"
+      };
+      var ship2 = {
+      };
+      var ship3 = {};
+      var ship4 = {};
+      var ship5 = {};
+
+      init();
+      animate();
+
+      function init() {
+
+        container = document.createElement( 'div' );
+        document.body.appendChild( container );
+
+        // var info = document.createElement( 'div' );
+        // info.style.position = 'absolute';
+        // info.style.top = '10px';
+        // info.style.width = '100%';
+        // info.style.textAlign = 'center';
+        // info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - orthographic view';
+        // container.appendChild( info );
+
+        camera = new THREE.OrthographicCamera( window.innerWidth / - 2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / - 2, - 500, 1000 );
+        camera.position.x = 200;
+        camera.position.y = 100;
+        camera.position.z = 200;
+
+        scene = new THREE.Scene();
+
+        // Grid
+
+        var size = 500, step = 50;
+
+        var geometry = new THREE.Geometry();
+
+        for ( var i = 0; i <= size; i += step ) {
+
+          geometry.vertices.push( new THREE.Vector3( - size, 0, i ) );
+          geometry.vertices.push( new THREE.Vector3(   0, 0, i ) );
+
+          geometry.vertices.push( new THREE.Vector3( -i, 0, 0) );
+          geometry.vertices.push( new THREE.Vector3( -i, 0,   size ) );
+
+        }
+        for ( var i = 0; i <= size; i += step ) {
+
+          geometry.vertices.push( new THREE.Vector3(  size, 0, -i ) );
+          geometry.vertices.push( new THREE.Vector3(   0, 0, -i ) );
+
+          geometry.vertices.push( new THREE.Vector3(  i, 0, 0) );
+          geometry.vertices.push( new THREE.Vector3(  i, 0,   -size ) );
+
+        }
+
+        var material = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.2 } );
+
+        var line = new THREE.Line( geometry, material );
+        line.type = THREE.LinePieces;
+        scene.add( line );
+
+
+        var manager = new THREE.LoadingManager();
+        manager.onProgress = function ( item, loaded, total ) {
+
+          console.log( item, loaded, total );
+
+        };
+        // for (i=1; i<=5; i++){
+        var loader = new THREE.OBJLoader( manager );
+        // var shipName = 'ship' + i;
+        loader.load( 'static/res/obj/Battleship_OBJ.obj', function ( object ) {
+
+          object.scale.set(3,3,3);
+          object.rotation.set(0, Math.PI/2, 0);
+          // object.position.x = Math.floor( ( 0.2 * 1000 - 500 ) / 50 ) * 50 + 25;
+          object.position.x = getXPositionL(4, 4, 'x');
+          object.position.y = 25;
+          object.position.z = getZPositionL(4, 4, 'x');
+          scene.add( object );
+
+        } );
+      // }
+
+
+        // Lights
+
+        var ambientLight = new THREE.AmbientLight( Math.random() * 0x10 );
+        scene.add( ambientLight );
+
+        var directionalLight = new THREE.DirectionalLight( Math.random() * 0xffffff );
+        directionalLight.position.x = Math.random() - 0.5;
+        directionalLight.position.y = Math.random() - 0.5;
+        directionalLight.position.z = Math.random() - 0.5;
+        directionalLight.position.normalize();
+        scene.add( directionalLight );
+
+        var directionalLight = new THREE.DirectionalLight( Math.random() * 0xffffff );
+        directionalLight.position.x = Math.random() - 0.5;
+        directionalLight.position.y = Math.random() - 0.5;
+        directionalLight.position.z = Math.random() - 0.5;
+        directionalLight.position.normalize();
+        scene.add( directionalLight );
+
+                 //sphere
+         //SphereGeometry(RADIUS,SEGMENTWIDTH,SEGMENTHEIGHT)
+         // var geometry = new THREE.SphereGeometry(3, 10, 10);
+         // var material = new THREE.MeshBasicMaterial({wireframe: true,color: 0x555555});
+         // var sphere = new THREE.Mesh( geometry, material );
+         // sphere.position.set(0,0,1);
+         // scene.add( sphere );
+             
+             
+         //    //grid xy
+         //    var gridXY = new THREE.GridHelper(10, 1);
+         //    gridXY.rotation.x = Math.PI/2;
+         //    scene.add(gridXY);
+              
+             
+             
+         //particle
+            //smoke bomb
+         //    var settings = {
+         //      positionStyle  : Type.SPHERE,
+         //      positionBase   : new THREE.Vector3( 0, 0, 1 ),
+         //      positionRadius : 1,
+                 
+         //      velocityStyle  : Type.SPHERE,
+         //         speedBase     : 2,
+         //         speedSpread   : 4,
+               
+         //      particleTexture : THREE.ImageUtils.loadTexture( 'static/res/img/smokeparticle.png' ),
+         
+         //      sizeTween    : new Tween( [0,4], [5,10] ),
+         //      opacityTween : new Tween( [0, 5], [0.6, 0.3] ),
+         //      colorTween   : new Tween( [0.2, 1], [ new THREE.Vector3(0.0, 0, 1), new THREE.Vector3(0.05, 0, 0.5) ] ),
+               
+         //      particlesPerSecond : 100,
+         //      particleDeathAge   : 4,  
+         //      emitterDeathAge    : 60
+         //     };
+             
+         //    engine = new ParticleEngine();
+         // engine.setValues( settings );
+         // engine.initialize();
+console.log("bomb");
+          material = new THREE.ShaderMaterial( {
+              vertexShader: document.getElementById( 'vertexShader' ).textContent,
+              fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+          } );
+          // material = new THREE.ShaderMaterial( {
+          //     vertexShader: [
+          //       "varing vec2 vUv;",
+          //       "void main(): {",
+          //       "vUv = uv;",
+          //       "console.log(vUv)",
+          //       "gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+          //       "}"
+          //     ].join("\n"),
+          //     fragmentShader: [
+          //       "varying vec2 vUv;",
+          //       "void main() {",
+          //       "gl_FragColor = vec4( vec3( vUv, 0. ), 1. );",
+          //       "}"
+          //     ].join("\n")
+          // } );
+          
+          // create a sphere and assign the material
+          mesh = new THREE.Mesh( 
+              new THREE.IcosahedronGeometry( 50, 4 ), 
+              material 
+          );
+          mesh.position.set(0, 25, 200);
+          scene.add( mesh );
+
+        renderer = new THREE.CanvasRenderer();
+        renderer.setClearColor( 0xf0f0f0 );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+        container.appendChild( renderer.domElement );
+        window.addEventListener( 'resize', onWindowResize, false );
+
+      }
+
+      function onWindowResize() {
+
+        camera.left = window.innerWidth / - 2;
+        camera.right = window.innerWidth / 2;
+        camera.top = window.innerHeight / 2;
+        camera.bottom = window.innerHeight / - 2;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+      }
+
+      function getXPositionL(x, size, direction) {
+        if(direction == 'z'){
+          return x * 50 + 25 - 500;
+        }
+        else if (size%2){
+          console.log((x + size/2) * 50) + 25;
+          return  (x + size/2) * 50 +25 - 500;
+        }
+        else{
+          console.log((x + size/2) * 50) - 500;
+          return   (x + size/2) * 50 - 500;
+        }
+      }
+
+
+      function getZPositionL(z, size, direction) {
+        if(direction == 'x'){
+          return z * 50 + 25;
+        }
+        else if (size%2){
+          console.log((z + size/2) * 50) + 25;
+          return   (z + size/2) * 50 +25;
+        }
+        else{
+          console.log((z + size/2) * 50);
+          return   (z + size/2) * 50 ;
+        }
+      }
+
+      function animate() {
+
+        requestAnimationFrame( animate );
+
+        render();
+        // stats.update();
+
+      }
+
+      function render() {
+
+        // var timer = Date.now() * 0.0001;
+
+        // camera.position.x = Math.cos( timer ) * 200;
+        // camera.position.z = Math.sin( timer ) * 200;
+        camera.lookAt( scene.position );
+
+        // bomb();
+        renderer.render( scene, camera );
+
+         // engine.update( 0.01 * 0.5 );
+      }
+      function bomb() {
+        // create a wireframe material   
+          console.log("bomb");
+          material = new THREE.ShaderMaterial( {
+              vertexShader: document.getElementById( 'vertexShader' ).textContent,
+              fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+          } );
+          // material = new THREE.ShaderMaterial( {
+          //     vertexShader: [
+          //       "varing vec2 vUv;",
+          //       "void main(): {",
+          //       "vUv = uv;",
+          //       "console.log(vUv)",
+          //       "gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );",
+          //       "}"
+          //     ].join("\n"),
+          //     fragmentShader: [
+          //       "varying vec2 vUv;",
+          //       "void main() {",
+          //       "gl_FragColor = vec4( vec3( vUv, 0. ), 1. );",
+          //       "}"
+          //     ].join("\n")
+          // } );
+          
+          // create a sphere and assign the material
+          mesh = new THREE.Mesh( 
+              new THREE.IcosahedronGeometry( 50, 4 ), 
+              material 
+          );
+          mesh.position.set(0, 25, 200);
+          scene.add( mesh );
+      }
+
+    </script>
+
+  </body>
+</html>
