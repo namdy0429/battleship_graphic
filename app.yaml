@@ -7,8 +7,8 @@ handlers:
 # HTML PAGES
 # ex) http://project-id.appspot.com/
 - url: /
-  static_files: index.html
-  upload: index.html
+  static_files: index2.html
+  upload: index2.html
   mime_type: text/html
 
 
